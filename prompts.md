@@ -22,14 +22,22 @@ Borra el ejemplo de abajo cuando escribas el primero.
 
 ## Prompt 1
 
-**Modelo:** Opus 1M xHigh
+**Modelo:** Opus 5.5 medium
 **Herramienta:** Claude Code
 
 ```
-Este es el ejemplo. Bórralo.
+ Vamos hacer una auditoria de una funcionalidad concreta en esta aplicacion. La funcionalidad a auditar es "Comentarios" Este blog tiene 5
+  funcionalidades posts, comentarios, autores, categorías y etiquetas. Centrate unicamente en comentarios  crear,editar, borrar y listar comentarios.
+  El formato:
+  Por cada hallazgo :
+  - Que es: Una frase mas de una indica que es mas de un hallazgo.
+  - Donde esta: Linea donde lo encuentras
+  - Que rompe y quien lo nota. El efecto de lo que rompe y quien lo nota. Nadie haun es una respuesta valida
+  - Cuantos sitions se tiene que tocar para arreglar-lo: No estimes cuenta
+  - Se puede deshacer con un revert? Si o  no, en caso de no explica el porque
+  - Bloquea o desbloquea otro hallazgo? Nombra al otro. A ninguno es la respuesta mas frequente
 
-El prompt va aquí dentro, entero y con sus saltos de línea,
-para que se sepa dónde empieza y dónde acaba.
+  Escribe la auditoria en docs/auditoria/comentarios.md
 ```
 
-**Qué salió:** (opcional, una línea) funcionó a la primera / tuve que insistir / me inventó una ruta que no existe.
+**Qué salió:** Creo el fichero de auditoria.

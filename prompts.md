@@ -1,7 +1,7 @@
 # Prompts
 
 Todos los prompts lanzados para hacer el ejercicio, en el orden en que se lanzaron, con el modelo
-y la herramienta de cada uno. Reconstruido a partir de `prompt_track.md`.
+y la herramienta de cada uno.
 
 ---
 
@@ -221,94 +221,3 @@ recuerda que la casilla h2b la comprobé por web, Contexto de lo que comprobé y
 ```
 
 **Qué salió:** H2b marcado como comprobado en la web. Sin otros cambios.
-
----
-
-## Prompt 15
-
-**Modelo:** Opus 5.5
-**Herramienta:** Claude Code
-
-```
-que hace make fuga?
-```
-
-**Qué salió:** Explicación de `Makefile:48-53`, con el matiz de que su `grep` también captura el correo del autor del post, no solo el de los comentaristas.
-
----
-
-## Prompt 16
-
-**Modelo:** Opus 5.5
-**Herramienta:** Claude Code
-
-```
-bien cerremos. que más falta
-```
-
-**Qué salió:** Pendientes según el README: Parte B, prompts.md, commit, push y PR, y comprobar la suite antes del commit.
-
----
-
-## Prompt 17
-
-**Modelo:** Opus 5.5
-**Herramienta:** Claude Code
-
-```
-corre la suite para que veas los resultados
-```
-
-**Qué salió:** Suite en verde (1 de 1). El primer intento falló por usar el npm de Windows desde WSL.
-
----
-
-## Prompt 18
-
-**Modelo:** Opus 5.5
-**Herramienta:** Claude Code
-
-```
-pude verificar que la api tiene criterio distinto  sobre el uso de valores Aprobado y que no se utiliza enum. Dame candidatos para la parte b
-```
-
-**Qué salió:** Candidatos redactados para las tres líneas de la Parte B.
-
----
-
-## Prompt 19
-
-**Modelo:** Opus 5.5
-**Herramienta:** Claude Code
-
-```
-Abrí los archivos al ver los extractos por ejemplo en routes.ts las lineas de estados y referencias a comentarios. Finalizó el  análisis  Para 1, 6 devueltos, 4 comprobados
-```
-
-**Qué salió:** Línea 1 de la Parte B escrita con mis palabras.
-
----
-
-## Prompt 20
-
-**Modelo:** Opus 5.5
-**Herramienta:** Claude Code
-
-```
-para el 2.  el agregado bug en el comentario parece intrascendente incluso roza la duda si está hecho a drede.
-```
-
-**Qué salió:** Línea 2 escrita sobre H2b. El agente añadió una referencia propia (`Comentarios.jsx:8-10`) y lo dijo.
-
----
-
-## Prompt 21
-
-**Modelo:** Opus 5.5
-**Herramienta:** Claude Code
-
-```
-para la 3 R4
-```
-
-**Qué salió:** Línea 3 escrita sobre R4. Parte B completa.

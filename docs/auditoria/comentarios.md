@@ -32,11 +32,15 @@ Hallazgo = comprobado o visto en el código; R = riesgo (efecto deducido, no eje
    6 devueltos, 4 comprobados.
 
 2. El hallazgo del que no supe decidir la prioridad, y por qué.
-   H2b: sumar uno al contador al enviar un comentario parece intrascendente (se corrige al recargar)
-   e incluso roza la duda de si está hecho a propósito, como una actualización optimista
-   (`Comentarios.jsx:8-10` lo describe sin marcarlo como error).
+   R4: no parece claro si es una falla o un borrado hecho a propósito para un administrador
+   (`routes.ts:348-353`).
 
 3. Algo que el agente afirmó y no pude verificar.
    R4: que con los correos expuestos por H1 se puedan borrar comentarios ajenos
-   (`routes.ts:350-353`, `:359`). Comprobarlo exige lanzar un DELETE, fuera del alcance de una
-   auditoría de solo lectura.
+   (`routes.ts:350-353`, `:359`). Comprobarlo exige lanzar un DELETE. Le pedí al agente que no editara ni borrara nada y no lanzó las pruebas. Lo noté cuando ya se agotó el tiempo.
+
+## Después del reloj
+
+Al correr la suite de tests manualmente reparé en que solo cubría el camino feliz, pero el agente no lo trató como hallazgo ni le dio precedencia. La feature de comentarios tiene un solo test (`backend/tests/functional/comentarios.spec.ts:15-42`), el camino feliz de crear, con dos aserciones. La suite sale en verde con los seis hallazgos dentro. Bloquea el arreglo seguro de todos: antes hay que escribir los tests (`CLAUDE.md:72`, `CLAUDE.md:95-102`). Por precedencia iría el primero.
+
+Corrección a la casilla 6 de H1: arreglarlo reduce la exposición de R4, pero no lo cierra ni es requisito para arreglarlo. La clave (`routes.ts:25`, `:351`) sigue permitiendo borrar cualquier comentario, y `post.autor_email` (`routes.ts:111`, `:167`), los que haya escrito el autor del post con ese correo.

@@ -1,6 +1,6 @@
-# Auditoría de comentarios · v2 (compacta)
+# Auditoría de comentarios
 
-**Fecha:** 2026-11-22 · Sustituye a `comentarios.md` e incorpora `comentarios-verificacion.md`.
+**Fecha:** 2026-11-22.
 
 **Alcance.** API: `backend/start/routes.ts` (POST, DELETE, PATCH, detalle y recuentos). BD: migración `1769000000005_create_comentarios_table.ts`, `blog_seeder.ts` y `tmp/db.sqlite3` abierta en solo lectura. Web: `Comentarios.jsx` y `DetallePost.jsx`.
 

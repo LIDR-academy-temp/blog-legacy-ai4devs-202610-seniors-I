@@ -20,16 +20,47 @@ Borra el ejemplo de abajo cuando escribas el primero.
 
 ---
 
-## Prompt 1
+## Prompts
 
-**Modelo:** Opus 1M xHigh
+**Modelo:** Sonnet
 **Herramienta:** Claude Code
 
-```
-Este es el ejemplo. Bórralo.
+## Prompt 1
 
-El prompt va aquí dentro, entero y con sus saltos de línea,
-para que se sepa dónde empieza y dónde acaba.
+```
+lee el @README.md y explicame el ejercicio, tanto la parte A como la parte
+  B. Create tambien el archivo docs/auditoria/comentarios.md con una
+  plantilla con explicacion de como lo tengo que completar
 ```
 
-**Qué salió:** (opcional, una línea) funcionó a la primera / tuve que insistir / me inventó una ruta que no existe.
+## Prompt 2
+
+```
+ si a la tabla de hallazgos la tiene que completar el agente, por que me
+  decis que la columna arhivo:linea tiene que ser comprobada por mi? Hay
+  datos de la tabla que tengo que completar a mano yo?
+```
+
+**Qué salió:** Me aclaro que la parte A la hace el agente
+
+## Prompt 3
+
+```
+ Necesito que hagas la parte A del ejercicio, en la que rellenas la tabla de hallazgos del archivo @docs/auditoria/comentarios.md. Tanto en el @README.md como en el archivo
+  @docs/auditoria/comentarios.md hay instrucciones sobre como llenarla. Recuerda que vamos a auditar solo la feature de comentarios, incluyendo:
+  - API: crear, editar y borrar comentarios, y los comentarios dentro del detalle del post.
+  - Base de datos: la tabla comentarios.
+  - Web: lo que el frontend enseña de ellos.
+```
+
+## Prompt 4
+
+```
+ me generas un DER, un diagrama de base de datos asi veo de forma simple las tablas, su estructura y su relacion? (Puede ser en mermaid o cualquier grafico simple)
+```
+
+## Prompt 5
+
+```
+ En la parte B me dice que tengo que decir que hallazgo no supe priorizar, pero que tarea me dice que tengo que priorizar la lista?
+```

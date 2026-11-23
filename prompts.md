@@ -22,14 +22,44 @@ Borra el ejemplo de abajo cuando escribas el primero.
 
 ## Prompt 1
 
-**Modelo:** Opus 1M xHigh
+**Modelo:** Opus 5.5
 **Herramienta:** Claude Code
 
 ```
-Este es el ejemplo. Bórralo.
-
-El prompt va aquí dentro, entero y con sus saltos de línea,
-para que se sepa dónde empieza y dónde acaba.
+Lee lo que hay que hacer en este ejercicio y prepara un plannotator para ir punto por punto y guiarme en como hacerlo
 ```
 
-**Qué salió:** (opcional, una línea) funcionó a la primera / tuve que insistir / me inventó una ruta que no existe.
+**Qué salió:** leyó README, prompts.md, CLAUDE.md y el comando /refactor, comprobó el entorno (fork, deps, base, gh) y escribió una guía de 8 pasos en un markdown, pero Plannotator no arrancó por un bloqueo de permisos (`$.process.run`), así que la guía quedó en un archivo local y ofreció seguir por el chat.
+
+## Prompt 2
+
+**Modelo:** Opus 5.5
+**Herramienta:** Claude Code
+
+```
+A partir de ahora, anade los prompts y las respuestas en prompts.md utilizando el mismo formato que el ejemplo
+```
+
+**Qué salió:** borró el ejemplo y registró en este archivo los prompts 1 y 2 con un resumen de la respuesta.
+
+## Prompt 3
+
+**Modelo:** Opus 5.5
+**Herramienta:** Claude Code
+
+```
+dame un ejemplo de un hallazgo siguiento el formato que indica el readme
+```
+
+**Qué salió:** leyó las rutas de comentarios, la migración y Comentarios.jsx, y devolvió un hallazgo de ejemplo con las 6 casillas: el POST relee el comentario con `order by id desc limit 1` (routes.ts:330) en vez de por su id.
+
+## Prompt 4
+
+**Modelo:** Opus 5.5
+**Herramienta:** Claude Code
+
+```
+acorde con el ejercicio, encuentra los hallazgos en el codigo de comentarios e indicame donde estan
+```
+
+**Qué salió:** leyó routes.ts entero, la migración, la semilla, el handler, el test existente y los componentes del front, y devolvió 18 hallazgos priorizados con archivo y línea, más correcciones a tres de los míos (respuestas que sí se ven, cuerpo vacío que sí se rechaza).

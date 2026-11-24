@@ -1,0 +1,102 @@
+# Auditoría de la feature de comentarios
+
+Alcance: crear, editar, borrar y listar comentarios, en las tres capas (rutas de la API,
+tabla `comentarios` y lo que la web enseña). Nada más del blog.
+
+Método: lectura completa de `backend/start/routes.ts`, la migración de comentarios, la
+semilla, `frontend/src/componentes/Comentarios.jsx`, `DetallePost.jsx`, `ListaPosts.jsx` y
+`backend/tests/functional/comentarios.spec.ts`, contrastados con `app/controllers/`,
+`app/validators/user.ts` y `app/transformers/user_transformer.ts`. Lo que se puede comprobar
+por HTTP se comprobó por HTTP, contra la API levantada sobre la base sembrada. Dos excepciones,
+y las digo: la fila 20 va solo con la lectura del SQL, porque no conseguí reproducir su efecto;
+y los números de la web se deducen del JSX, sin abrir un navegador.
+
+Las cifras de las filas 6, 7 y 10 se midieron con la base recién sembrada, antes de las pruebas
+destructivas. Cada prueba que borró o editó una fila se deshizo con `make db`, y al terminar la
+base quedó como estaba.
+
+**El orden de las filas es la prioridad.** Primero lo que se puede explotar hoy sin
+credenciales, después lo que hace que la feature no cierre o que el dato que el blog enseña
+sea falso, y al final lo que se paga en cada cambio sin romper nada hoy.
+
+| # | Qué es | Dónde está (la línea) | Qué se rompe y quién lo nota | Sitios a tocar | ¿Se deshace con un revert? | ¿Bloquea o desbloquea a otro hallazgo? |
+|---|---|---|---|---|---|---|
+| 1 | Cualquiera borra el comentario de cualquiera presentando el correo del autor, que la propia API publica. | `backend/start/routes.ts:350-357`: el correo llega por `request.input('autor_email', '')` y la única comprobación es compararlo con el de la fila. Comprobado: `DELETE /comentarios/4?autor_email=silvia.pena@ejemplo.es` devuelve `200 {"borrado":true}`, y la credencial viaja en la URL. Comprobado también sobre una fila insertada a mano con `autor_email` vacío: un `DELETE` sin cuerpo la borra. | Borrado arbitrario de comentarios ajenos, y en masa si alguien automatiza la lista de correos. No deja rastro. Lo nota el autor cuando entra y ya no está. | 3: la comprobación del `DELETE`, un mecanismo de identidad del comentarista (hoy no existe: solo hay un correo libre) y la columna que lo guarde. | No en los datos: lo borrado no vuelve. El código se revierte, el comentario perdido no. | Depende del 2: sin la fuga del correo no habría con qué firmar el borrado. |
+| 2 | La respuesta pública del post sirve el correo de cada comentarista, y el alta y la edición lo devuelven también. | `backend/start/routes.ts:152-155` (`select * from comentarios`) servido tal cual en `:171`; otra vez en el alta, `:329-333`; y otra en la edición, `:389-392`. Los otros dos `select *` de la tabla (`:340`, `:367`) son lecturas internas, no respuestas. Comprobado: el JSON del post 1 trae `"autor_email":"ana.cortes@ejemplo.es"`, y en todo `Comentarios.jsx` (1-91) no hay una sola aparición de `autor_email`. | Incumple la regla 6 del README y la línea 61 de `CLAUDE.md`. Lo nota cualquiera que abra la pestaña de red: el blog reparte correos personales que no necesita y alimenta el hallazgo 1. | 3: las tres respuestas que devuelven la fila cruda (detalle, alta y edición). | Sí. Pero no recoge los correos ya servidos. | Desbloquea al 1: le entrega la credencial. Y lo arregla el 4, que es donde hay sitio para recortar campos. |
+| 3 | La clave de moderación está escrita en el repositorio. | `backend/start/routes.ts:25` (`const SECRETO_SESION = 'dev-secret-cambiar'`), usada como `x-clave-moderacion` en `:349-351`. Comprobado: `DELETE /comentarios/9` con esa cabecera devuelve `200`, sin saber ningún correo. | Cualquiera con el repo o su historial borra y modera cualquier comentario: no hay usuario, no hay rol, no hay revocación. Lo nota el blog entero el día que alguien lo lea. | 3: la constante, la comparación y `backend/start/env.ts` para la variable nueva. | No: la clave queda en el historial de git. Hay que rotarla, no revertirla. | Desbloquea al 4 y al 5: no se puede decidir quién modera sin sacar esto del código. |
+| 4 | Toda la feature vive en la ruta: SQL, validación, autorización y forma de la respuesta. | `backend/start/routes.ts:295-393` (las tres rutas de comentarios) más el detalle de `:109-175`, que también los sirve; `CLAUDE.md:59` lo prohíbe y `CLAUDE.md:48-55` fija el flujo. El único ejemplo correcto del repo es `backend/app/controllers/profile_controller.ts:5-6`. | Sin transformer no hay sitio donde recortar campos, así que la fuga del 2 no es un descuido: es la arquitectura. La autorización ya está escrita dos veces (`:352-353` para borrar, `:379` para editar) y salió distinta. Cada arreglo de esta tabla se vuelve a escribir a mano. | 4 rutas a 5 ficheros nuevos (controlador, validador, servicio, repositorio, transformer) más `routes.ts`. | Sí, si va en un commit aislado y sin cambios de comportamiento. No, si los demás arreglos ya se apoyan encima. | Abarata el arreglo de 1, 2, 3, 6, 7 y 16. Hecho al final, lo encarece. |
+| 5 | No hay ningún endpoint que pase un comentario de `pendiente` a `aprobado`. | `backend/start/routes.ts:326` inserta siempre `'pendiente'`, y ninguna ruta escribe ni actualiza `estado` después: las apariciones en el archivo son lecturas (`:75-76`, `:153`, `:223`, `:379`) y ese literal. El único sitio que escribe estados es la semilla (`blog_seeder.ts:128`). | Todo comentario real nace invisible y se queda invisible para siempre salvo que alguien abra SQLite a mano: el blog entero enseña cuatro comentarios, los cuatro sembrados que están en `aprobado`. Lo nota el comentarista, que lee «pendiente de moderación» y no vuelve a verlo nunca. | 2: una ruta nueva y su validador. | Sí: es aditivo. Los pendientes acumulados siguen pendientes. | Bloqueado por el 3: primero hay que decidir quién modera. Mientras no exista, los efectos de 6 y 7 quedan escondidos por falta de datos. |
+| 6 | El recuento cuenta todo lo que no esté `pendiente` en vez de los aprobados. | `backend/start/routes.ts:75` (listado) y `:223` (relacionados), ambos con `estado <> 'pendiente'`. Comprobado: el post 1 anuncia **4** en el listado y el detalle enseña **2**; el post 6 anuncia **1** y enseña **0**. | Incumple la regla 5. Cuenta como aprobado cualquier estado futuro (`spam`, `rechazado`) y los dos heredados del hallazgo 8. Lo nota el lector, que compara la tarjeta con el artículo y deduce que se han perdido comentarios. | 2: las dos consultas. | Sí. | No se arregla solo: con `estado` sin normalizar (8) el número correcto sigue sin cuadrar con la lista. |
+| 7 | El detalle solo enseña `aprobado` en minúsculas, así que comentarios marcados como aprobados son invisibles. | `backend/start/routes.ts:150-155` (el comentario de `:150-151` lo admite: «los que se guardaron como 'Aprobado' o como 'ok' no salen por aquí»); los datos en `backend/database/seeders/blog_seeder.ts:509-511`, `:521-523` y `:574-576`. Comprobado: el post 6 anuncia un comentario y devuelve cero. | Se pierden comentarios que alguien marcó como aprobados, y el código no dice quién ni cuándo. Lo nota el autor del comentario, y nadie más: no hay ningún aviso de que exista. | 2: la consulta y una migración de datos que normalice los estados. | No: los datos ya están escritos así; revertir la normalización los devuelve al limbo. | Depende del 8. |
+| 8 | `estado` es texto libre, sin `CHECK` ni enum. | `backend/database/migrations/1769000000005_create_comentarios_table.ts:4-5` lo admite en el comentario y `:18` (`table.string('estado')`); en la semilla conviven `Aprobado` (2 filas), `ok` (1) y `aprobado` (4). | Es la causa de los hallazgos 6 y 7 y de que una errata cree un estado nuevo que nadie filtra. No lo nota nadie hasta que un comentario aprobado no aparece, y entonces se busca el fallo en el código equivocado. | 7 en 3 archivos: una migración nueva (normalizar y añadir el `CHECK`), la semilla y cinco literales en `routes.ts` (`:75`, `:153`, `:223`, `:326`, `:379`). | No: normalizar exige migración de datos, y volver atrás los corrompe otra vez. | Desbloquea al 6, al 7 y a cualquier test que afirme el contrato entero. |
+| 9 | La feature no tiene tests: un caso feliz y una sola aserción de contenido. | `backend/tests/functional/comentarios.spec.ts:41-42`: `assertStatus(201)` y `assert.equal(...autor_nombre, 'Lucía Ferrer')`. Ni el `403`, ni el `404`, ni el recuento, ni un `notProperty('autor_email')`. | No se rompe nada hoy y no lo nota nadie: es exactamente por eso. La suite está verde con la fuga, el borrado ajeno y el recuento mal, así que el hook `guard-tests` da paso a todo lo anterior. Lo nota el siguiente que toque la feature. | 1 archivo, y 2 endpoints (borrado y edición) sin una sola prueba. | No aplica: no hay nada que revertir, el hueco es la ausencia. | Es el paso previo obligatorio de quien arregle 1, 2, 6, 7 y 16. |
+| 10 | En el detalle hay dos recuentos del mismo dato, y el de la sección sube sin que haya comentario visible. | `frontend/src/componentes/Comentarios.jsx:11` (estado propio), `:23` (lo inicializa) y `:39` (`setTotal(total + 1)`, con el valor de la render anterior); `DetallePost.jsx:30` y `:38` para el suyo. | Al enviar, la sección anuncia un comentario más del que pinta y la cabecera sigue igual; dos envíos seguidos antes de repintar pierden uno. Lo nota quien acaba de comentar: el formulario dice «pendiente de moderación» y el contador dice que ya está publicado. | 2: los dos componentes. | Sí. | A ninguno; multiplica el descuadre del 6. |
+| 11 | El front pinta dos niveles de respuestas y tira el resto. | `frontend/src/componentes/Comentarios.jsx:50` (parte solo de las raíces) y `:63-72` (busca hijos directos), mientras la API solo devuelve aprobados (`routes.ts:152-155`). | Una respuesta aprobada a un comentario pendiente no se pinta nunca, y una respuesta a una respuesta tampoco, sin ningún error. Hoy no lo nota nadie: el formulario de `Comentarios.jsx:76-88` no tiene campo de respuesta, así que solo se dispara insertando por API o sembrando. | 2: el componente y la consulta que tendría que devolver también el padre. | Sí. | Depende del 7: con los estados normalizados cambia qué cuenta como padre visible. |
+| 12 | `padre_id` se guarda sin comprobar nada, y la columna no tiene clave foránea. | `backend/start/routes.ts:308` (se lee) y `:326` (va tal cual al `insert`); migración `1769000000005:20` (`.nullable()`, sin `references`). Comprobado: `padre_id: 999999` devuelve `201`. | Se cuelgan respuestas de comentarios inexistentes o de otro post, y en el detalle no aparecen nunca. Hoy no lo nota nadie porque no hay formulario de respuesta (fila 11). | 2: la validación de entrada y una migración. | La validación sí. La clave foránea no: es migración y hay que limpiar antes los huérfanos que ya existan. | Alimenta al 11: es la vía por la que se crean los comentarios que luego no se pintan. |
+| 13 | El alta de comentarios resuelve el post por `slug` con `limit 1` sobre una columna que no es única. | `backend/start/routes.ts:296-299`; la migración `1769000000004_create_posts_table.ts:20` crea `slug` sin `unique` y su propio comentario en `:10` lo dice. | Con dos posts del mismo slug, el comentario cae en el que SQLite devuelva primero, que puede no ser el que se está leyendo. Entra porque decide dónde aterriza el comentario, aunque el arreglo toque el esquema de posts. Nadie todavía: la semilla no tiene duplicados. | 2: un `unique` en la migración y el manejo del `limit 1`. | No: añadir el `unique` falla sobre datos ya duplicados; hay que decidir qué fila se queda. | A ninguno. |
+| 14 | Un comentario demasiado corto responde `200` con `{ok:false}`. | `backend/start/routes.ts:319-321`. Comprobado: `cuerpo: "abc"` devuelve `200 {"ok":false,"motivo":"comentario demasiado corto"}`. | Cualquier cliente que mire el código HTTP cree que se guardó, y el fallo se puede monitorizar como éxito. Hoy no lo nota nadie: el formulario mira `d.comentario` (`Comentarios.jsx:37`) y se entera igual. Lo notará el primer consumidor de la API, que el README publica. | 1: la comprobación, más el test de caracterización que exige `CLAUDE.md:100` antes de cambiarla. | Sí. | Alimenta al 15. |
+| 15 | La misma validación describe el fallo con tres cuerpos distintos. | `backend/start/routes.ts:310-318`: `400 {error}` en `:311`, `422 {message}` en `:314` y `400 {errores:[...]}` en `:317`. El cliente (`frontend/src/componentes/Comentarios.jsx:44`) lee `error` y `message`, y no lee `errores`. | Un correo inválido enseña «No se ha podido enviar.» en vez de decir qué falta, y el usuario vuelve a enviarlo igual. Lo nota quien rellena el formulario. | 2: la ruta y el formulario. | Sí. | A ninguno: es otro defecto distinto del 14, aunque los dos salgan de la misma validación escrita a mano. |
+| 16 | Editar reimplementa la autorización distinta que borrar, y con el mismo agujero de credencial. | `backend/start/routes.ts:375-381`: `comentario.autor_email !== email` sin `trim` ni `toLowerCase`, exige `estado === 'pendiente'` y no mira la cabecera de moderación. Comprobado: correo en mayúsculas devuelve `403`, comentario aprobado devuelve `403`, la clave de moderación devuelve `403`; y sobre una fila insertada a mano con `autor_email` vacío, un `PATCH` sin credencial devuelve `200`. | El autor no puede corregir su comentario si escribe el correo con otra caja, ni en cuanto se aprueba, y con una fila de correo vacío edita cualquiera. Lo nota el autor sobre su propio texto. | 1: la comprobación. | Sí. | Es la prueba de que el 4 hace falta: la misma regla, dos versiones. Debe converger con el 3. |
+| 17 | El mínimo del cuerpo cambia según el verbo: 5 al crear, 1 al editar. | `backend/start/routes.ts:383-386` (`if (!cuerpo)`) frente a `:319` (`String(cuerpo).length < 5`). | Un comentario que nació con cinco caracteres se puede dejar en uno editándolo: el mínimo no es una propiedad del campo, es del verbo, y quien lea la tabla no puede saber cuál vale. Hoy no lo nota nadie porque no hay quien modere (fila 5); lo notará el día que lo haya. | 2: las dos comprobaciones. | Sí. | A ninguno. |
+| 18 | No hay validador: el correo se comprueba con un `indexOf('@')` y no hay tamaño máximo. | `backend/start/routes.ts:316-318` (`String(email).indexOf('@')`) y `:319`/`:385` (sin máximo). Comprobado: `autor_email: "@"` devuelve `201` y un cuerpo de 200 000 caracteres también. | Entran correos imposibles y cuerpos de 200 KB, así que no se puede distinguir un comentarista real de uno inventado ni confiar en que la fila quepa en una vista. Hoy no lo nota nadie: sin moderación no hay nada que se atasque. | 2: la comprobación del correo y la del cuerpo. | Sí. | A ninguno. |
+| 19 | El detalle devuelve todos los comentarios aprobados sin límite ni paginación. | `backend/start/routes.ts:152-155`, sin `limit`; servido en `:171`. | El peso del artículo crece sin techo, y como `Comentarios.jsx:19` vuelve a pedir el post entero para sacar los comentarios, se paga dos veces por visita. Hoy el máximo sembrado son dos: no lo nota nadie todavía. | 1 la consulta, 2 si se añade paginación en el front. | Sí, mientras nadie dependa de la paginación. | Al paginar, `d.comentarios.length` deja de ser el total y la cabecera del artículo (`DetallePost.jsx:38,71`) se pone a mentir por su cuenta, aunque el 6 esté arreglado. |
+| 20 | El alta no acota la respuesta al comentario que acaba de insertar: devuelve la última fila de la tabla. | `backend/start/routes.ts:329-331`: `select * from comentarios order by id desc limit 1`, sin filtrar por el `insert` anterior. **No lo pude reproducir**: 65 peticiones concurrentes en uno y dos procesos contra la misma SQLite, cero cruces. | Si otra escritura entra entre el `insert` y el `select` (otra instancia, una importación, el propio `make db`), la respuesta es el comentario de otra persona, con su correo. Queda como defecto de contrato no reproducido, no como fuga observada. | 1: la consulta posterior al `insert`. | Sí. | A ninguno; si ocurre, multiplica el daño del 2. |
+
+## Parte B: las tres líneas
+
+1. **Cuántos hallazgos devolvió el agente y cuántos comprobé.** Devolvió **16**. Comprobé **20**
+   abriendo las 20 citas en el archivo, y 19 también llamando a la API; la 20 solo la leí, porque
+   su efecto no lo pude reproducir. De las 16 suyas salen 20 filas así: una la partí yo en dos
+   (`estado` sin `CHECK` y «el detalle solo pinta `aprobado` exacto» tienen arreglos distintos),
+   otra se partió en la segunda pasada a propuesta mía (los tres cuerpos de error y el
+   `200 {ok:false}`), y añadí dos que no vio (el mínimo del cuerpo según el verbo y la falta de
+   paginación), que él aceptó. Le corregí una cifra y él me corrigió otra: yo había medido 3
+   comentarios no pendientes en el post 1 cuando son 4, porque mis propias pruebas habían
+   borrado una fila y no había vuelto a sembrar. Descarté 5 que había escrito: la cabecera del
+   artículo contra la tarjeta del listado (la segunda pasada demostró que es el mismo fallo del
+   recuento visto por el lector, no otra causa), la URL de la API copiada seis veces, el
+   `key={index}`, el índice de `post_id` y el desfase de `creado_en`.
+
+2. **El hallazgo del que no supe decidir la prioridad.** El 8, `estado` como texto libre: es la
+   causa raíz de los hallazgos 6 y 7, así que empuja hacia arriba; pero según el comentario de
+   la semilla los valores raros vienen de 2024 y el blog ha funcionado así desde entonces, y no
+   tengo forma de saber si alguien se quejó. También se defiende dejarlo abajo y arreglar solo
+   los síntomas primero.
+
+3. **Algo que el agente afirmó y no pude verificar.** La fila 20 —que el alta no acota la
+   respuesta al comentario insertado— la sostiene solo la lectura del SQL: 65 peticiones
+   concurrentes en uno y dos procesos contra la misma SQLite no produjeron ni un cruce, así que
+   el agente retiró el «recibe el comentario de otra persona» como hecho observado y lo dejó
+   como defecto de contrato latente. Tampoco pude verificar que los estados `Aprobado` y `ok`
+   los escribieran «el panel viejo de moderación» y «un script de importación de 2024»: solo lo
+   dice un comentario de la semilla.
+
+## Descartado, y por qué
+
+De los 15 descartes del agente recojo aquí 10; los otros cinco o se integraron en una fila (la
+credencial vacía, los campos internos de la respuesta, el `200 {ok:false}`), o eran de la
+feature de posts, o no tenían efecto que señalar.
+
+- **XSS por el cuerpo del comentario.** No: React escapa `{c.cuerpo}` en `Comentarios.jsx:61`
+  y no hay `dangerouslySetInnerHTML` en la feature. El de `DetallePost.jsx:92` es el cuerpo del
+  post, otra feature.
+- **Inyección SQL.** No: todos los valores van por `?`; lo único concatenado son fragmentos
+  fijos (`routes.ts:49-79`). Probado con `id='1 or 1=1'`: 404.
+- **Token robado o `401` ausente.** No hay token en la feature: ninguna ruta de comentarios
+  mira `auth`. Lo que sí viaja en la URL es la credencial de borrado, y eso está en la fila 1.
+- **Sin rate limiting ni captcha en el alta.** El estado `pendiente` ya impide que el spam se
+  publique, y no hay requisito escrito.
+- **La cabecera del artículo contra la tarjeta del listado, como fila propia.** Hoy la
+  divergencia la explica entera el recuento (fila 6). Se vuelve independiente en cuanto el
+  detalle pagine, y así queda anotado en la fila 19.
+- **Sin índice en `comentarios.post_id`.** Rendimiento sin medir sobre nueve filas; la falta de
+  clave foránea en `padre_id` sí entró (fila 12) porque tiene efecto sobre los datos.
+- **`creado_en` generado en UTC frente a la semilla.** Con `TZ=UTC` en `.env` no consigo
+  demostrar ni un día de desfase; sería una queja sobre el formato, no sobre el dato.
+- **Que el `403` frente al `404` permita enumerar ids.** Información mínima, no explotable sin
+  la credencial de la fila 1.
+- **Duplicación y accesibilidad:** la URL de la API copiada seis veces, `key={index}` y la
+  falta de `<label>` en el formulario. Reales, pero sin regla escrita que incumplan ni efecto
+  que yo pueda medir.
+- **Que `Comentarios.jsx:19` vuelva a pedir el post entero.** No merece fila propia:
+  duplicación de red que no rompe nada. Se cita dentro de la 19 porque duplica el peso.
